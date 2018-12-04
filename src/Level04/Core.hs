@@ -7,6 +7,7 @@ module Level04.Core
 
 import           Control.Applicative                (liftA2)
 import           Control.Monad                      (join)
+import           Data.Bifunctor                     (first)
 
 import           Network.Wai                        (Application, Request,
                                                      Response, pathInfo,
@@ -32,7 +33,7 @@ import qualified Data.Aeson                         as A
 
 import           Database.SQLite.SimpleErrors.Types (SQLiteResponse)
 
-import           Level04.Conf                       (Conf, firstAppConfig)
+import           Level04.Conf                       (Conf(..), firstAppConfig)
 import qualified Level04.DB                         as DB
 import           Level04.Types                      (ContentType (JSON, PlainText),
                                                      Error (EmptyCommentText, EmptyTopic, UnknownRoute),
@@ -48,7 +49,7 @@ data StartUpError
   deriving Show
 
 runApp :: IO ()
-runApp = error "runApp needs re-implementing"
+runApp = prepareAppReqs >>= either (putStrLn . show) (\db -> run 3000 (app db))
 
 -- We need to complete the following steps to prepare our app requirements:
 --
@@ -59,8 +60,7 @@ runApp = error "runApp needs re-implementing"
 --
 prepareAppReqs
   :: IO ( Either StartUpError DB.FirstAppDB )
-prepareAppReqs =
-  error "prepareAppReqs not implemented"
+prepareAppReqs = first DBInitErr <$> (DB.initDB . dbFilePath $ firstAppConfig)
 
 -- | Some helper functions to make our lives a little more DRY.
 mkResponse
@@ -128,12 +128,15 @@ handleRequest
   :: DB.FirstAppDB
   -> RqType
   -> IO (Either Error Response)
-handleRequest _db (AddRq _ _) =
-  (resp200 PlainText "Success" <$) <$> error "AddRq handler not implemented"
-handleRequest _db (ViewRq _)  =
-  error "ViewRq handler not implemented"
-handleRequest _db ListRq      =
-  error "ListRq handler not implemented"
+handleRequest _db (AddRq topic commentText) =
+  do r <- DB.addCommentToTopic _db topic commentText
+     return $ (resp200 PlainText "Success") <$ r
+handleRequest _db (ViewRq topic)  =
+  do comments <- DB.getComments _db topic
+     return $ resp200Json <$> comments
+handleRequest _db ListRq = do
+  do topics <- DB.getTopics _db
+     return $ resp200Json <$> topics
 
 mkRequest
   :: Request

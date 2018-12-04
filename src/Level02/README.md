@@ -57,14 +57,14 @@ Using ``curl``:
 # Running a POST
 
 # Valid request
-$ curl -XPOST -v localhost:<port>/puppies/add -d "Puppies are awesome."
+$ curl -XPOST -v localhost:3000/puppies/add -d "Puppies are awesome."
 
 # Invalid request (should trigger an error in the program)
-$ curl -XPOST -v localhost:<port>/puppies/add
+$ curl -XPOST -v localhost:3000/puppies/add
 
 # Running a GET
-$ curl -XGET -v localhost:<port>/puppies/view
-$ curl -XGET -v localhost:<port>/list
+$ curl -XGET -v localhost:3000/puppies/view
+$ curl -XGET -v localhost:3000/list
 ```
 
 ### Loading the Program:

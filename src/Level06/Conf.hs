@@ -7,10 +7,10 @@ module Level06.Conf
 import           GHC.Word                 (Word16)
 
 import           Data.Bifunctor           (first)
-import           Data.Monoid              ((<>))
+import           Data.Monoid              ((<>), Last(..))
 
-import           Level06.Types            (Conf, ConfigError,
-                                           DBFilePath (DBFilePath), PartialConf,
+import           Level06.Types            (Conf(..), ConfigError(..),
+                                           DBFilePath (DBFilePath), PartialConf(..),
                                            Port (Port))
 
 import           Level06.Conf.CommandLine (commandLineParser)
@@ -21,8 +21,9 @@ import           Level06.Conf.File        (parseJSONConfigFile)
 -- configuration values from either the file or command line inputs.
 defaultConf
   :: PartialConf
-defaultConf =
-  error "defaultConf not implemented"
+defaultConf = PartialConf
+  (Last . Just . Port $ 3000)
+  (Last . Just . DBFilePath $ "myapp.db")
 
 -- We need something that will take our PartialConf and see if can finally build
 -- a complete ``Conf`` record. Also we need to highlight any missing values by
@@ -30,8 +31,9 @@ defaultConf =
 makeConfig
   :: PartialConf
   -> Either ConfigError Conf
-makeConfig =
-  error "makeConfig not implemented"
+makeConfig pc = Conf
+  <$> (maybe (Left MissingPort) Right (getLast . pcPort $ pc))
+  <*> (maybe (Left MissingDBFile) Right (getLast . pcDBFilePath $ pc))
 
 -- This is the function we'll actually export for building our configuration.
 -- Since it wraps all our efforts to read information from the command line, and
@@ -46,9 +48,7 @@ makeConfig =
 parseOptions
   :: FilePath
   -> IO (Either ConfigError Conf)
-parseOptions =
-  -- Parse the options from the config file: "files/appconfig.json"
-  -- Parse the options from the commandline using 'commandLineParser'
-  -- Combine these with the default configuration 'defaultConf'
-  -- Return the final configuration value
-  error "parseOptions not implemented"
+parseOptions path = do
+  commandConf <- commandLineParser
+  eitherJsonConf <- parseJSONConfigFile path
+  return $ eitherJsonConf >>= (\jsonConf -> makeConfig $ defaultConf <> jsonConf <> commandConf)

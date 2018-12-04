@@ -7,6 +7,7 @@ module Level05.Core
   ) where
 
 import           Control.Monad.IO.Class             (liftIO)
+import           Control.Monad.Except               (MonadError, catchError)
 
 import           Network.Wai                        (Application, Request,
                                                      Response, pathInfo,
@@ -22,6 +23,7 @@ import qualified Data.ByteString.Lazy               as LBS
 
 import           Data.Either                        (either)
 import           Data.Monoid                        ((<>))
+import           Data.Bifunctor                     (first)
 
 import           Data.Text                          (Text)
 import           Data.Text.Encoding                 (decodeUtf8)
@@ -53,8 +55,8 @@ runApp = do
   cfgE <- prepareAppReqs
   -- Loading the configuration can fail, so we have to take that into account now.
   case cfgE of
-    Left err   -> undefined
-    Right _cfg -> run undefined undefined
+    Left err   -> putStrLn . show $ err
+    Right _cfg -> run 3000 (app _cfg)
 
 -- We need to complete the following steps to prepare our app requirements:
 --
@@ -65,8 +67,7 @@ runApp = do
 --
 prepareAppReqs
   :: IO ( Either StartUpError DB.FirstAppDB )
-prepareAppReqs =
-  error "copy your prepareAppReqs from the previous level."
+prepareAppReqs = first DBInitErr <$> (DB.initDB . Conf.dbFilePath $ Conf.firstAppConfig)
 
 -- | Some helper functions to make our lives a little more DRY.
 mkResponse
@@ -118,8 +119,8 @@ resp200Json =
 app
   :: DB.FirstAppDB
   -> Application
-app db rq cb =
-  error "app not reimplemented"
+app db rq cb = (runAppM $ mkRequest rq >>= handleRequest db) >>= cb . (either mkErrorResponse id)
+
 
 handleRequest
   :: DB.FirstAppDB

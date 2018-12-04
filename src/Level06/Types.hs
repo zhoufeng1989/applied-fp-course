@@ -31,7 +31,7 @@ import           Data.Text                          (Text)
 
 import           System.IO.Error                    (IOError)
 
-import           Data.Monoid                        (Last,
+import           Data.Monoid                        (Last(..),
                                                      Monoid (mappend, mempty))
 import           Data.Semigroup                     (Semigroup ((<>)))
 
@@ -158,7 +158,10 @@ newtype DBFilePath = DBFilePath
 -- Add some fields to the ``Conf`` type:
 -- - A customisable port number: ``Port``
 -- - A filepath for our SQLite database: ``DBFilePath``
-data Conf = Conf
+data Conf = Conf {
+  port  :: Port,
+  dbFilePath :: DBFilePath
+}
 
 -- We're storing our Port as a Word16 to be more precise and prevent invalid
 -- values from being used in our application. However Wai is not so stringent.
@@ -173,13 +176,15 @@ data Conf = Conf
 confPortToWai
   :: Conf
   -> Int
-confPortToWai =
-  error "confPortToWai not implemented"
+confPortToWai (Conf p _) = fromIntegral . getPort $ p
 
 -- Similar to when we were considering our application types, leave this empty
 -- for now and add to it as you go.
-data ConfigError = ConfigError
-  deriving Show
+data ConfigError = ConfigReadError IOError
+                 | JsonDecodeError String
+                 | MissingPort
+                 | MissingDBFile
+                   deriving Show
 
 -- Our application will be able to load configuration from both a file and
 -- command line input. We want to be able to use the command line to temporarily
@@ -215,8 +220,8 @@ data PartialConf = PartialConf
 -- on the ``Semigroup`` instance for Last to always get the last value.
 instance Semigroup PartialConf where
   _a <> _b = PartialConf
-    { pcPort       = error "pcPort (<>) not implemented"
-    , pcDBFilePath = error "pcDBFilePath (<>) not implemented"
+    { pcPort       = (pcPort _a) <> (pcPort _b)
+    , pcDBFilePath = (pcDBFilePath _a) <> (pcDBFilePath _b)
     }
 
 -- We now define our ``Monoid`` instance for ``PartialConf``. Allowing us to
@@ -236,7 +241,9 @@ instance Monoid PartialConf where
 -- have to tell aeson how to go about converting the JSON into our PartialConf
 -- data structure.
 instance FromJSON PartialConf where
-  parseJSON = error "parseJSON for PartialConf not implemented yet."
+  parseJSON = A.withObject "PartialConf" $ \v -> PartialConf
+    <$> (Last . fmap Port <$> v A..:? "port")
+    <*> (Last . fmap DBFilePath <$> v A..: "dbFilePath")
 
 -- Go to 'src/Level06/Conf/File.hs' next
 

@@ -8,7 +8,7 @@ import           Test.Tasty.HUnit   (testCase)
 
 import           Network.HTTP.Types as HTTP
 
-import           Helpers            (assertBody, assertStatus, get, runTestsFor)
+import           Helpers            (assertBody, assertStatus, get, post, runTestsFor)
 
 import qualified Level03.Core       as Core
 
@@ -20,6 +20,27 @@ unitTests = runTestsFor Core.app "Level 03 Tests" $ do
   get "GET list route" "/list" >>= \resp -> do
     assertBody "List Request not implemented" resp
     assertStatus HTTP.status200 resp
+
+  post "POST add route" "/topic1/add" "comment1" >>= \resp -> do
+    assertBody "Hello there!" resp
+    assertStatus HTTP.status200 resp
+
+  post "POST add route with empty comment" "/topic1/add" "" >>= \resp -> do
+    assertBody "Empty Comment" resp
+    assertStatus HTTP.status400 resp
+
+  get "Get view route" "/topic1/view" >>= \resp -> do
+    assertBody "View Request not implemented" resp
+    assertStatus HTTP.status200 resp
+
+
+  get "Get view route with empty topic" "//view" >>= \resp -> do
+    assertBody "Empty Topic" resp
+    assertStatus HTTP.status400 resp
+
+  get "Get undefined route" "/undefined/route" >>= \resp -> do
+    assertBody "Unknown Route" resp
+    assertStatus HTTP.status404 resp
 
   -- Write some more tests, below are some ideas to get you started:
 

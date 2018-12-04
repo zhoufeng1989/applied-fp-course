@@ -30,7 +30,7 @@ import           Level05.Types                      (Comment, CommentText,
                                                      getCommentText, getTopic,
                                                      mkTopic)
 
-import           Level05.AppM                       (AppM)
+import           Level05.AppM                       (AppM(..))
 
 -- We have a data type to simplify passing around the information we need to run
 -- our database queries. This also allows things to change over time without
@@ -69,35 +69,50 @@ runDB
   :: (a -> Either Error b)
   -> IO a
   -> AppM b
-runDB =
-  error "Write 'runDB' to match the type signature"
+runDB f ioa = AppM $ do a <- ioa
+                        return . f $ a
 
 getComments
   :: FirstAppDB
   -> Topic
   -> AppM [Comment]
-getComments =
-  error "Copy your completed 'getComments' and refactor to match the new type signature"
+getComments appDb topic =
+  let
+    sql = "SELECT id,topic,comment,time FROM comments WHERE topic = ?"
+  in
+    AppM $ do dbComments <- Sql.query (dbConn appDb) sql (Sql.Only $ getTopic topic)
+              return . sequence $ fromDBComment <$> dbComments
 
 addCommentToTopic
   :: FirstAppDB
   -> Topic
   -> CommentText
   -> AppM ()
-addCommentToTopic =
-  error "Copy your completed 'appCommentToTopic' and refactor to match the new type signature"
+addCommentToTopic appDb topic comment =
+  let
+    sql = "INSERT INTO comments (topic,comment,time) VALUES (?,?,?)"
+  in
+    liftIO $ do currentTime <- getCurrentTime
+                Sql.execute (dbConn appDb) sql (getTopic topic, getCommentText comment, currentTime)
+                return ()
 
 getTopics
   :: FirstAppDB
   -> AppM [Topic]
-getTopics =
-  error "Copy your completed 'getTopics' and refactor to match the new type signature"
+getTopics appDb =
+  let
+    sql = "SELECT DISTINCT topic FROM comments"
+  in
+    AppM $ do topics <- Sql.query_ (dbConn appDb) sql
+              return $ traverse (mkTopic . Sql.fromOnly) topics
 
 deleteTopic
   :: FirstAppDB
   -> Topic
   -> AppM ()
-deleteTopic =
-  error "Copy your completed 'deleteTopic' and refactor to match the new type signature"
+deleteTopic appDb topic =
+  let
+    sql = "DELETE FROM comments WHERE topic = ?"
+  in
+    liftIO $ Sql.execute (dbConn appDb) sql (Sql.Only $ getTopic topic) >> (return ())
 
--- Go to 'src/Level05/Core.hs' next.

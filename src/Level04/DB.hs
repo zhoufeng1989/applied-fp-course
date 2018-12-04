@@ -15,14 +15,19 @@ import qualified Data.Text                          as Text
 
 import           Data.Time                          (getCurrentTime)
 
-import           Database.SQLite.Simple             (Connection, Query (Query))
+import           Control.Monad.IO.Class             (liftIO)
+
+import           Database.SQLite.Simple             (Connection, open, close, Query (Query),
+                                                     execute, execute_, query_, query)
 import qualified Database.SQLite.Simple             as Sql
 
 import qualified Database.SQLite.SimpleErrors       as Sql
 import           Database.SQLite.SimpleErrors.Types (SQLiteResponse)
 
 import           Level04.Types                      (Comment, CommentText,
-                                                     Error, Topic)
+                                                     Error, Topic, getTopic,
+                                                     getCommentText, mkTopic,
+                                                     fromDBComment)
 
 -- ------------------------------------------------------------------------|
 -- You'll need the documentation for sqlite-simple ready for this section! |
@@ -43,8 +48,7 @@ data FirstAppDB = FirstAppDB
 closeDB
   :: FirstAppDB
   -> IO ()
-closeDB =
-  error "closeDB not implemented"
+closeDB = close . dbConn
 
 -- Given a `FilePath` to our SQLite DB file, initialise the database and ensure
 -- our Table is there by running a query to create it, if it doesn't exist
@@ -52,8 +56,10 @@ closeDB =
 initDB
   :: FilePath
   -> IO ( Either SQLiteResponse FirstAppDB )
-initDB fp =
-  error "initDB not implemented"
+initDB fp = do
+  conn <- open fp
+  execute_ conn createTableQ
+  return . Right . FirstAppDB $ conn
   where
   -- Query has an `IsString` instance so string literals like this can be
   -- converted into a `Query` type when the `OverloadedStrings` language
@@ -74,7 +80,7 @@ getComments
   :: FirstAppDB
   -> Topic
   -> IO (Either Error [Comment])
-getComments =
+getComments appDb topic =
   let
     sql = "SELECT id,topic,comment,time FROM comments WHERE topic = ?"
   -- There are several possible implementations of this function. Particularly
@@ -82,34 +88,38 @@ getComments =
   -- cannot be converted to a Comment, or simply ignoring any DBComment that is
   -- not valid.
   in
-    error "getComments not implemented"
+    do dbComments <- query (dbConn appDb) sql (Sql.Only $ getTopic topic)
+       return . sequence $ fromDBComment <$> dbComments
 
 addCommentToTopic
   :: FirstAppDB
   -> Topic
   -> CommentText
   -> IO (Either Error ())
-addCommentToTopic =
+addCommentToTopic appDb topic comment =
   let
     sql = "INSERT INTO comments (topic,comment,time) VALUES (?,?,?)"
   in
-    error "addCommentToTopic not implemented"
+    do currentTime <- getCurrentTime
+       execute (dbConn appDb) sql (getTopic topic, getCommentText comment, currentTime)
+       return . Right $ ()
 
 getTopics
   :: FirstAppDB
   -> IO (Either Error [Topic])
-getTopics =
+getTopics appDb =
   let
     sql = "SELECT DISTINCT topic FROM comments"
   in
-    error "getTopics not implemented"
+    do topics <- query_ (dbConn appDb) sql
+       return $ traverse (mkTopic . Sql.fromOnly) topics
 
 deleteTopic
   :: FirstAppDB
   -> Topic
   -> IO (Either Error ())
-deleteTopic =
+deleteTopic appDb topic =
   let
     sql = "DELETE FROM comments WHERE topic = ?"
   in
-    error "deleteTopic not implemented"
+    execute (dbConn appDb) sql (Sql.Only $ getTopic topic) >> (return $ Right ())

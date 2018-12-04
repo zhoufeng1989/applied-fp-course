@@ -20,6 +20,7 @@ import           GHC.Generics              (Generic)
 
 import           Data.ByteString           (ByteString)
 import           Data.Text                 (Text)
+import           Data.Char                 (toLower)
 
 import           Data.List                 (stripPrefix)
 import           Data.Maybe                (fromMaybe)
@@ -30,7 +31,7 @@ import qualified Data.Aeson.Types          as A
 
 import           Data.Time                 (UTCTime)
 
-import           Level04.DB.Types          (DBComment)
+import           Level04.DB.Types          (DBComment(..))
 
 -- Notice how we've moved these types into their own modules. It's cheap and
 -- easy to add modules to carve out components in a Haskell application. So
@@ -71,8 +72,8 @@ data Comment = Comment
 modFieldLabel
   :: String
   -> String
-modFieldLabel =
-  error "modFieldLabel not implemented"
+modFieldLabel s = toLower <$> fromMaybe s (stripPrefix "comment" s)
+
 
 instance ToJSON Comment where
   -- This is one place where we can take advantage of our `Generic` instance.
@@ -97,8 +98,11 @@ instance ToJSON Comment where
 fromDBComment
   :: DBComment
   -> Either Error Comment
-fromDBComment =
-  error "fromDBComment not yet implemented"
+fromDBComment dbComment =
+            Comment (CommentId . dbCommentId $ dbComment)
+            <$> (mkTopic . dbCommentTopic $ dbComment)
+            <*> (mkCommentText . dbCommentComment $ dbComment)
+            <*> (return . dbCommentTime $ dbComment)
 
 data RqType
   = AddRq Topic CommentText

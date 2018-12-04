@@ -22,6 +22,7 @@ import qualified Data.ByteString.Lazy               as LBS
 
 import           Data.Either                        (either)
 import           Data.Monoid                        ((<>))
+import           Data.Bifunctor                     (bimap)
 
 import           Data.Text                          (Text)
 import           Data.Text.Encoding                 (decodeUtf8)
@@ -34,8 +35,9 @@ import qualified Data.Aeson                         as A
 import           Level06.AppM                       (AppM, liftEither, runAppM)
 import qualified Level06.Conf                       as Conf
 import qualified Level06.DB                         as DB
-import           Level06.Types                      (Conf, ContentType (..),
-                                                     Error (..),
+import           Level06.Types                      (Conf(..), ContentType (..),
+                                                     DBFilePath(..),
+                                                     Error (..), ConfigError,
                                                      RqType (AddRq, ListRq, ViewRq),
                                                      mkCommentText, mkTopic,
                                                      renderContentType)
@@ -45,6 +47,7 @@ import           Level06.Types                      (Conf, ContentType (..),
 -- single type so that we can deal with the entire start-up process as a whole.
 data StartUpError
   = DBInitErr SQLiteResponse
+  | ConfErr ConfigError
   deriving Show
 
 runApp :: IO ()
@@ -66,8 +69,13 @@ runApp = do
 --
 prepareAppReqs
   :: IO ( Either StartUpError ( Conf, DB.FirstAppDB ) )
-prepareAppReqs =
-  error "copy your prepareAppReqs from the previous level."
+prepareAppReqs = do
+  eitherConf <- Conf.parseOptions "files/appconfig.json"
+  case eitherConf of
+    Left err -> return . Left . ConfErr $ err
+    Right conf ->
+      bimap DBInitErr ((,) conf) <$> initDb conf
+        where initDb = DB.initDB . getDBFilePath . dbFilePath
 
 -- | Some helper functions to make our lives a little more DRY.
 mkResponse

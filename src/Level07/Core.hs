@@ -45,10 +45,10 @@ import           Level07.Types                      (Conf (dbFilePath),
                                                      mkCommentText, mkTopic)
 
 import           Level07.AppM                       (AppM, Env (Env, envConfig, envDB, envLoggingFn),
-                                                     liftEither)
+                                                     liftEither, runAppM)
 
 -- We're going to use the `mtl` ExceptT monad transformer to make the loading of our `Conf` a bit more straight-forward.
-import           Control.Monad.Except               (ExceptT (..), runExceptT)
+import           Control.Monad.Except               (ExceptT (..), runExceptT, withExceptT)
 
 -- Our start-up is becoming more complicated and could fail in new and
 -- interesting ways. But we also want to be able to capture these errors in a
@@ -77,7 +77,12 @@ runApp = do
 prepareAppReqs
   :: IO (Either StartUpError Env)
 prepareAppReqs = runExceptT $
-  error "Copy your completed 'prepareAppReqs' from the previous level and refactor it here"
+  withExceptT ConfErr (ExceptT . Conf.parseOptions $ "files/appconfig.json")
+    >>= \conf ->
+          let initDb = DB.initDB . dbFilePath
+          in withExceptT DBInitErr (ExceptT . initDb $ conf)
+            >>= \appDb -> let f t = liftIO $ hPutStrLn stderr t
+                          in return $ Env f conf appDb
 
 -- Now that our request handling and response creating functions operate
 -- within our AppM context, we need to run the AppM to get our IO action out
@@ -86,8 +91,11 @@ prepareAppReqs = runExceptT $
 app
   :: Env
   -> Application
-app =
-  error "Copy your completed 'app' from the previous level and refactor it here"
+app env rq cb =
+  runAppM (handleRequest =<< mkRequest rq) env >>= cb . handleRespErr
+  where
+    handleRespErr :: Either Error Response -> Response
+    handleRespErr = either mkErrorResponse id
 
 handleRequest
   :: RqType
